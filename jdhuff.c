@@ -350,7 +350,7 @@ jpeg_make_d_derived_tbl (j_decompress_ptr cinfo, boolean isDC, int tblno,
 				  SIZEOF(d_derived_tbl));
   dtbl = *pdtbl;
   dtbl->pub = htbl;		/* fill in back link */
-  
+
   /* Figure C.1: make table of Huffman code length for each symbol */
 
   p = 0;
@@ -363,10 +363,10 @@ jpeg_make_d_derived_tbl (j_decompress_ptr cinfo, boolean isDC, int tblno,
   }
   huffsize[p] = 0;
   numsymbols = p;
-  
+
   /* Figure C.2: generate the codes themselves */
   /* We also validate that the counts represent a legal Huffman code tree. */
-  
+
   code = 0;
   si = huffsize[0];
   p = 0;
@@ -671,7 +671,7 @@ process_restart (j_decompress_ptr cinfo)
 /*
  * Huffman MCU decoding.
  * Each of these routines decodes and returns one MCU's worth of
- * Huffman-compressed coefficients. 
+ * Huffman-compressed coefficients.
  * The coefficients are reordered from zigzag order into natural array order,
  * but are not dequantized.
  *
@@ -693,7 +693,7 @@ process_restart (j_decompress_ptr cinfo)
 
 METHODDEF(boolean)
 decode_mcu_DC_first (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
-{   
+{
   huff_entropy_ptr entropy = (huff_entropy_ptr) cinfo->entropy;
   int Al = cinfo->Al;
   register int s, r;
@@ -764,7 +764,7 @@ decode_mcu_DC_first (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
 
 METHODDEF(boolean)
 decode_mcu_AC_first (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
-{   
+{
   huff_entropy_ptr entropy = (huff_entropy_ptr) cinfo->entropy;
   register int s, k, r;
   unsigned int EOBRUN;
@@ -853,7 +853,7 @@ decode_mcu_AC_first (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
 
 METHODDEF(boolean)
 decode_mcu_DC_refine (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
-{   
+{
   huff_entropy_ptr entropy = (huff_entropy_ptr) cinfo->entropy;
   int p1 = 1 << cinfo->Al;	/* 1 in the bit position being coded */
   int blkn;
@@ -902,7 +902,7 @@ decode_mcu_DC_refine (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
 
 METHODDEF(boolean)
 decode_mcu_AC_refine (j_decompress_ptr cinfo, JBLOCKROW *MCU_data)
-{   
+{
   huff_entropy_ptr entropy = (huff_entropy_ptr) cinfo->entropy;
   register int s, k, r;
   unsigned int EOBRUN;
@@ -1538,4 +1538,38 @@ jinit_huff_decoder (j_decompress_ptr cinfo)
       entropy->dc_derived_tbls[i] = entropy->ac_derived_tbls[i] = NULL;
     }
   }
+}
+
+
+/*
+ * BEWARE OF KLUDGE:  This subroutine is a hack for decoding illegal JPEG-in-
+ *                    TIFF encapsulations produced by Microsoft's Wang Imaging
+ * for Windows application with the public-domain TIFF Library.  Based upon an
+ * examination of selected output files, this program apparently divides a JPEG
+ * bit-stream into consecutive horizontal TIFF "strips", such that the JPEG
+ * encoder's/decoder's DC coefficients for each image component are reset before
+ * each "strip".  Moreover, a "strip" is not necessarily encoded in a multiple
+ * of 8 bits, so one must sometimes discard 1-7 bits at the end of each "strip"
+ * for alignment to the next input-Byte storage boundary.  IJG JPEG Library
+ * decoder state is not normally exposed to client applications, so this sub-
+ * routine provides the TIFF Library with a "hook" to make these corrections.
+ * It should be called after "jpeg_start_decompress()" and before
+ * "jpeg_finish_decompress()", just before decoding each "strip" using
+ * "jpeg_read_raw_data()" or "jpeg_read_scanlines()".
+ *
+ * This kludge is not sanctioned or supported by the Independent JPEG Group, and
+ * future changes to the IJG JPEG Library might invalidate it.  Do not send bug
+ * reports about this code to IJG developers.  Instead, contact the author for
+ * advice: Scott B. Marovich <marovich@hpl.hp.com>, Hewlett-Packard Labs, 6/01.
+ */
+GLOBAL(void)
+jpeg_reset_huff_decode (register j_decompress_ptr cinfo,register float *refbw)
+{ register huff_entropy_ptr entropy = (huff_entropy_ptr)cinfo->entropy;
+  register int ci = 0;
+
+  /* Re-initialize DC predictions */
+  do entropy->saved.last_dc_val[ci] = -refbw[ci << 1];
+  while (++ci < cinfo->comps_in_scan);
+  /* Discard encoded input bits, up to the next Byte boundary */
+  entropy->bitstate.bits_left &= ~7;
 }
