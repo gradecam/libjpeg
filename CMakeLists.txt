@@ -8,9 +8,15 @@ project(libjpeg C)
 cmake_minimum_required(VERSION 2.6)
 include(cmake/dist.cmake)
 
-include(CheckIncludeFile)
-check_include_file(stddef.h HAVE_STDDEF_H)
-check_include_file(stdlib.h HAVE_STDLIB_H)
+if (NOT EMSCRIPTEN)
+    include(CheckIncludeFile)
+    check_include_file(stddef.h HAVE_STDDEF_H)
+    check_include_file(stdlib.h HAVE_STDLIB_H)
+else()
+    # emscripten checkincludefile not working
+    set(HAVE_STDDEF_H 1)
+    set(HAVE_STDLIB_H 1)
+endif()
 if(WIN32 AND NOT CYGWIN)  #improve? see jconfig.*
     set(TWO_FILE_COMMANDLINE true) # jconfig.h
 endif()
